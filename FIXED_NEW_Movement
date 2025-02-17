@@ -1,0 +1,124 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class Movement : MonoBehaviour
+{
+    [SerializeField] private InputAction thrust;
+    [SerializeField] private InputAction rotation;
+    [SerializeField] private float thrustForce = 100f;
+    [SerializeField] private float rotationSpeed = 50f;
+    [SerializeField] private float maxAngularSpeed = 2f;
+    [SerializeField] private bool usePhysicsRotation = true;
+    [SerializeField] private float rotationLerpSpeed = 5f;
+    [SerializeField] private float rotationDamping = 0.05f;
+    [SerializeField] private float obstacleRotationSlowdown = 0.5f;
+    [SerializeField] private float audioFadeSpeed = 2f;
+    [SerializeField] private AudioClip thrustSound;
+    [SerializeField] private AudioClip fallingSound;
+
+    private Rigidbody rb;
+    private AudioSource thrustAudioSource;
+    private AudioSource fallAudioSource;
+    private bool isRotating = false;
+    private float currentRotationSpeed = 0f;
+    
+    private void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        rb.constraints = RigidbodyConstraints.FreezePositionZ;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+        
+        thrustAudioSource = gameObject.AddComponent<AudioSource>();
+        fallAudioSource = gameObject.AddComponent<AudioSource>();
+        
+        thrustAudioSource.clip = thrustSound;
+        fallAudioSource.clip = fallingSound;
+        thrustAudioSource.loop = true;
+        fallAudioSource.loop = true;
+    }
+
+    private void OnEnable()
+    {
+        thrust.Enable();
+        rotation.Enable();
+    }
+
+    private void OnDisable()
+    {
+        thrust.Disable();
+        rotation.Disable();
+    }
+
+    private void FixedUpdate()
+    {
+        ProcessThrust();
+        ProcessRotation();
+    }
+
+    private void ProcessThrust()
+    {
+        float thrustInput = thrust.ReadValue<float>();
+        if (thrustInput > 0)
+        {
+            rb.AddRelativeForce(Vector3.up * thrustForce * thrustInput * Time.fixedDeltaTime);
+            
+            if (!thrustAudioSource.isPlaying) thrustAudioSource.Play();
+            thrustAudioSource.volume = Mathf.Lerp(thrustAudioSource.volume, thrustInput * 0.5f, Time.fixedDeltaTime * audioFadeSpeed);
+            
+            fallAudioSource.volume = Mathf.Lerp(fallAudioSource.volume, 0f, Time.fixedDeltaTime * audioFadeSpeed);
+            if (fallAudioSource.volume < 0.01f && fallAudioSource.isPlaying) fallAudioSource.Stop();
+        }
+        else if (rb.linearVelocity.y < -0.5f)
+        {
+            if (!fallAudioSource.isPlaying) fallAudioSource.Play();
+            fallAudioSource.volume = Mathf.Lerp(fallAudioSource.volume, 0.3f, Time.fixedDeltaTime * audioFadeSpeed);
+            
+            thrustAudioSource.volume = Mathf.Lerp(thrustAudioSource.volume, 0f, Time.fixedDeltaTime * audioFadeSpeed);
+            if (thrustAudioSource.volume < 0.01f && thrustAudioSource.isPlaying) thrustAudioSource.Stop();
+        }
+        else
+        {
+            thrustAudioSource.volume = Mathf.Lerp(thrustAudioSource.volume, 0f, Time.fixedDeltaTime * audioFadeSpeed);
+            fallAudioSource.volume = Mathf.Lerp(fallAudioSource.volume, 0f, Time.fixedDeltaTime * audioFadeSpeed);
+            
+            if (thrustAudioSource.volume < 0.01f && thrustAudioSource.isPlaying) thrustAudioSource.Stop();
+            if (fallAudioSource.volume < 0.01f && fallAudioSource.isPlaying) fallAudioSource.Stop();
+        }
+    }
+
+    private void ProcessRotation()
+    {
+        float rotationInput = rotation.ReadValue<float>();
+        if (rotationInput != 0)
+        {
+            isRotating = true;
+            currentRotationSpeed = Mathf.Lerp(currentRotationSpeed, rotationInput * rotationSpeed, Time.fixedDeltaTime * rotationLerpSpeed);
+            
+            if (usePhysicsRotation)
+            {
+                rb.angularDamping = 5f;
+                rb.AddTorque(Vector3.back * currentRotationSpeed * Time.fixedDeltaTime);
+            }
+            else
+            {
+                transform.Rotate(Vector3.back * currentRotationSpeed * Time.fixedDeltaTime);
+            }
+        }
+        else if (isRotating)
+        {
+            rb.angularVelocity = Vector3.zero;
+            rb.angularDamping = rotationDamping;
+            isRotating = false;
+        }
+        
+        rb.angularVelocity = Vector3.ClampMagnitude(rb.angularVelocity, maxAngularSpeed);
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Obstacle"))
+        {
+            rb.angularVelocity *= obstacleRotationSlowdown;
+        }
+    }
+}
