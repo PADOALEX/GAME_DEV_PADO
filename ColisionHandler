@@ -3,9 +3,21 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 public class ColisionHandler : MonoBehaviour
 {
-  [SerializeField] float levelLoadDelay = 1f;
+    [SerializeField] float levelLoadDelay = 5f;
+    [SerializeField] AudioClip crashSound;
+    [SerializeField] AudioClip finishSound;
+    [SerializeField] ParticleSystem crashParticles;
+    [SerializeField] ParticleSystem finishParticles;
+    AudioSource audioSource;
+    bool isTransitioning = false;
+    private void Start()
+    {
+        audioSource = GetComponent<AudioSource>();
+    }
     private void OnCollisionEnter(Collision other)
     {
+        if (isTransitioning) return;
+
         switch (other.gameObject.tag)
         {
             case "Friendly":
@@ -20,17 +32,44 @@ public class ColisionHandler : MonoBehaviour
         }
     }
     void StartSuccesSequence()
+{
+    isTransitioning = true;
+    audioSource.Stop();
+    Debug.Log("You finished the level");
+    audioSource.PlayOneShot(finishSound);
+    finishParticles.Play();
+    Movement movement = GetComponent<Movement>();
+    AudioSource[] audioSources = movement.GetComponents<AudioSource>();
+    foreach (AudioSource source in audioSources)
     {
-        Debug.Log("You finished the level");
-        GetComponent<Movement>().enabled = false;
-        Invoke("LoadNextLevel", levelLoadDelay);
+        if (source != audioSource)
+        {
+            source.Stop();
+        }
     }
+    
+    movement.enabled = false;
+    Invoke("LoadNextLevel", levelLoadDelay);
+}
     void StartCrashSequence()
+{
+    isTransitioning = true;
+    audioSource.Stop();
+    Debug.Log("You crashed!");
+    audioSource.PlayOneShot(crashSound);
+    crashParticles.Play();
+    Movement movement = GetComponent<Movement>();
+    AudioSource[] audioSources = movement.GetComponents<AudioSource>();
+    foreach (AudioSource source in audioSources)
     {
-        GetComponent<Movement>().enabled = false;
-        Invoke("ReloadLevel", levelLoadDelay);
-    }
-
+        if (source != audioSource)
+        {
+            source.Stop();
+        }
+    }    
+    movement.enabled = false;
+    Invoke("ReloadLevel", levelLoadDelay);
+}
     void LoadNextLevel()
     {
         int currentScene = SceneManager.GetActiveScene().buildIndex;
