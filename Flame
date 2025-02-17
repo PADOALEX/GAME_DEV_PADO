@@ -1,0 +1,37 @@
+using UnityEngine;
+
+public class RocketFlameController : MonoBehaviour
+{
+    private ParticleSystem flameEffect;
+
+    void Start()
+    {
+        flameEffect = GetComponentInChildren<ParticleSystem>();
+
+        if (flameEffect != null)
+        {
+            flameEffect.Stop();
+        }
+    }
+
+    void Update()
+    {
+        if (flameEffect == null) return;
+
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            if (!flameEffect.isPlaying)
+            {
+                flameEffect.Play();
+            }
+        }
+
+        if (Input.GetKeyUp(KeyCode.Space))
+        {
+            if (flameEffect.isPlaying)
+            {
+                flameEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            }
+        }
+    }
+}
